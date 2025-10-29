@@ -1,19 +1,21 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useTrip } from '../hooks/useTrip'
+import { useWeather } from '../hooks/useWeather'
+import { getWeather, getTripWeatherMessages } from '../services/weatherService'
 import { useState, useEffect } from 'react'
 import Popover from './Popover'
 import dayjs from 'dayjs'
-import { getWeather, getTripWeatherMessages } from '../services/weatherService'
 import Button from './ui/Button'
 
 // 앱 크롬(사이드바 + 상단바)과 로그아웃 동작 담당
 export default function Layout(){
   const loc = useLocation()
   const nav = useNavigate()
+  const { getCurrentUser, logout: logoutHook, getAvatar } = useAuth()
   const [user, setUser] = useState(null)
+  const [avatar, setAvatar] = useState('')
   const [openBell, setOpenBell] = useState(false)
-  const { getCurrentUser, logout } = useAuth()
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -22,17 +24,20 @@ export default function Layout(){
         try {
           const userData = await getCurrentUser()
           setUser(userData)
+          const savedAvatar = getAvatar()
+          setAvatar(savedAvatar || '')
         } catch (err) {
           console.error('사용자 정보 조회 실패:', err)
+          setUser(null)
         }
       }
     }
     fetchUser()
   }, [loc.pathname])
   return (
-    <div className="grid h-screen overflow-hidden" style={{gridTemplateColumns: '280px 1fr'}}>
+    <div className="grid h-screen" style={{gridTemplateColumns: '280px 1fr'}}>
       <aside className="px-5 py-6 bg-gradient-sidebar backdrop-blur border-r border-primary-dark/12 relative overflow-hidden">
-        <div className="font-bold text-2xl tracking-tight mb-8 text-sidebar-brand" style={{filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.08))'}}>Plan‑it</div>
+        <div className="font-bold text-2xl tracking-tight mb-8 text-sidebar-brand cursor-pointer hover:opacity-80 transition" style={{filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.08))'}} onClick={()=>nav('/')}>Plan‑it</div>
         <nav className="flex flex-col gap-2">
           <NavLink to="/" className={({isActive})=> isActive
             ? 'no-underline px-4 py-3 rounded-xl transition-all duration-200 relative overflow-hidden flex gap-3 items-center font-semibold text-white shadow-button bg-gradient-primary'
@@ -54,7 +59,7 @@ export default function Layout(){
           </NavLink>
         </nav>
       </aside>
-      <div className="flex flex-col h-screen overflow-hidden">
+      <div className="flex flex-col h-screen overflow-y-auto">
         <div className="bg-surface rounded-t-3xl mx-6 p-5 pb-6 backdrop-blur border border-primary-dark/12 relative">
           <header className="flex gap-4 items-center py-5 px-6 bg-bg-card backdrop-blur border-b border-primary-dark/15 sticky top-0 z-10">
             <div className="flex items-center gap-3 flex-1 min-w-[420px]">
@@ -68,11 +73,17 @@ export default function Layout(){
               </Popover>
               {user ? (
                 <div className="flex gap-3 items-center">
-                  <div className="w-10 h-10 rounded-full bg-gradient-primary grid place-items-center font-semibold text-white cursor-pointer transition border-2 border-emerald-500/20 hover:scale-105" onClick={()=>nav('/profile')}>{user.username?.[0]?.toUpperCase()||user.email?.[0]?.toUpperCase()||'U'}</div>
+                  <div className="w-10 h-10 rounded-full bg-gradient-primary grid place-items-center font-semibold text-white cursor-pointer transition border-2 border-emerald-500/20 hover:scale-105 overflow-hidden" onClick={()=>nav('/profile')}>
+                    {avatar ? (
+                      <img src={avatar} alt="프로필" className="w-full h-full object-cover" />
+                    ) : (
+                      user.username?.[0]?.toUpperCase()||user.email?.[0]?.toUpperCase()||'U'
+                    )}
+                  </div>
                   <div className="flex flex-col leading-tight">
                     <div className="font-semibold text-text">{user.username || user.email || 'User'}</div>
                   </div>
-                  <Button variant="inverse" onClick={()=>{ logout(); nav('/login') }}>로그아웃</Button>
+                  <Button variant="inverse" onClick={()=>{ logoutHook(); nav('/login') }}>로그아웃</Button>
                 </div>
               ) : (
                 <Button onClick={()=>nav('/login')}>로그인</Button>
@@ -87,11 +98,10 @@ export default function Layout(){
 }
 
 // 여행 일정과 날씨 정보를 합쳐 알림 목록 생성
-// 여행 일정과 날씨 정보를 합쳐 알림 목록 생성
 function BellContent() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
-  const [nextTrip, setNextTrip] = useState(null) // ✅ 추가
+  const [nextTrip, setNextTrip] = useState(null) 
   const { getNextTrip } = useTrip()
   const { getCurrentUser } = useAuth()
 
@@ -107,7 +117,7 @@ function BellContent() {
         }
 
         const trip = await getNextTrip(user.id)
-        setNextTrip(trip) // ✅ 저장
+        setNextTrip(trip) 
 
         if (!trip) {
           setItems([{ text: '다가오는 여행이 없습니다.', head: true }])
@@ -118,16 +128,13 @@ function BellContent() {
         const startDate = dayjs(trip.start_date)
         const endDate = dayjs(trip.end_date)
         const diff = startDate.diff(now, 'day')
-
-        console.log('🎯 trip 데이터:', trip)
-        console.log('🕒 diff:', diff)
-        console.log('🌐 lat/lon:', trip.lat, trip.lon)
         
         let notifications = [
           { text: '🌤️ 여행 알림', head: true },
           { text: `✈️ "${trip.title}" 여행 D-${diff}` },
         ]
 
+        //최대 5일 갖고 올 수 있음
         if (diff <= 4 && diff >= 0 && trip.city_name) {
           const weatherMessages = await getTripWeatherMessages({
             city_name: trip.city_name,
@@ -138,13 +145,12 @@ function BellContent() {
             diffDays: diff,
           })
 
-          console.log('🌦️ 날씨 메시지:', weatherMessages)
           if (weatherMessages && weatherMessages.length > 0) {
             weatherMessages.forEach((m) => {
               notifications.push({ text: m })
             })
           } else {
-            notifications.push({ text: '❌ 표시할 날씨 예보가 없습니다.' })
+            notifications.push({ text: '표시할 날씨 예보가 없습니다.' })
           }
         }
 
@@ -169,15 +175,13 @@ function BellContent() {
   }
 
   return (
-    <div>
-      {items.map((n, i) =>
-        n.head ? (
-          <div
-            key={i}
-            className="text-sm font-medium text-text-soft mb-2 flex items-center gap-2"
-          >
-            {n.text}
-          </div>
+    <div>{items.map((n, i) => n.head ? 
+      (<div 
+          key={i}
+          className="text-sm font-medium text-text-soft mb-2 flex items-center gap-2"
+        >
+          {n.text}
+        </div>
         ) : (
           <div
             key={i}

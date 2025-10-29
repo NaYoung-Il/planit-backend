@@ -6,19 +6,19 @@ import Button from '../components/ui/Button'
 
 // Profile : 닉네임/아바타 편집
 export default function Profile(){
+  const { getCurrentUser, updateUser, uploadAvatar, getAvatar, deleteAvatar } = useAuth()
   const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
   const [avatar, setAvatar] = useState('')
-  const [avatarFileName, setAvatarFileName] = useState('')
+  const [uploading, setUploading] = useState(false)
   const fileRef = useRef()
-  const { getCurrentUser, updateUser, loading, error } = useAuth()
 
   useEffect(() => {
     const fetchUser = async () => {
       try {
         const user = await getCurrentUser()
-        setName(user.username || '')
-        setEmail(user.email || '')
+        setName(user?.username || user?.email || '')
+        const savedAvatar = getAvatar()
+        setAvatar(savedAvatar || '')
       } catch (err) {
         console.error('사용자 정보 조회 실패:', err)
       }
@@ -31,15 +31,27 @@ export default function Profile(){
       await updateUser({ username: name })
       alert('저장되었습니다')
     } catch (err) {
-      alert('저장에 실패했습니다: ' + (error || '알 수 없는 오류'))
+      alert('저장에 실패했습니다')
     }
   }
-  const onUpload = (f)=>{
+  
+  const onUpload = async (f)=>{
     if(!f) return
-    const reader = new FileReader();
-    reader.onload=()=> setAvatar(reader.result);
-    reader.readAsDataURL(f)
-    setAvatarFileName(f.name)
+    setUploading(true)
+    try {
+      const result = await uploadAvatar(f)
+      setAvatar(result.avatar_url)
+    } catch (err) {
+      console.error('업로드 실패:', err)
+      alert('이미지 업로드에 실패했습니다')
+    } finally {
+      setUploading(false)
+    }
+  }
+  
+  const onDelete = () => {
+    deleteAvatar()
+    setAvatar('')
   }
   return (
     <Card title="프로필 편집" className="overflow-visible">
@@ -57,9 +69,10 @@ export default function Profile(){
             />
             <div className="flex flex-col gap-2 text-xs font-semibold text-text-soft">
               <span>아바타 이미지</span>
-              <div className="flex items-center gap-3 w-full">
-                <button type="button" className="px-4 py-2 rounded-lg bg-gradient-primary text-white text-xs font-semibold shadow-button hover:-translate-y-px transition" onClick={()=>fileRef.current?.click()}>업로드</button>
-                <div className="flex-1 min-h-[40px] px-3 py-2 rounded-lg border border-primary-dark/20 bg-surface text-text text-xs flex items-center">{avatarFileName || '선택된 파일 없음'}</div>
+              <div className="flex gap-2">
+                <button type="button" className="px-4 py-2 rounded-lg bg-gradient-primary text-white text-xs font-semibold shadow-button hover:-translate-y-px transition" onClick={()=>fileRef.current?.click()}>이미지 선택</button>
+                {avatar && (
+                  <button type="button" className="px-4 py-2 rounded-lg bg-red-500 text-white text-xs font-semibold shadow-button hover:-translate-y-px transition" onClick={onDelete}>삭제</button>)}
               </div>
               <input ref={fileRef} type="file" accept="image/*" onChange={e=>onUpload(e.target.files?.[0])} className="hidden" />
             </div>

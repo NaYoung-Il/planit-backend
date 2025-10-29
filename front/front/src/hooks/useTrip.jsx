@@ -259,8 +259,8 @@ export const useTrip = () => {
       setLoading(false)
     }
   }
-
-  // ✅ 알림(날씨용): 백엔드에서 lat/lon 포함된 가장 가까운 여행 조회
+  // 홈 > 벨(일정별 날씨 조회)에서 사용됨
+  // 백엔드에서 lat/lon 포함된 가장 가까운 여행 조회됨
   const getNextTrip = async (userId) => {
     setLoading(true)
     setError(null)
@@ -268,14 +268,13 @@ export const useTrip = () => {
       const response = await api.get(`/trips/next/${userId}`)
       return response.data || null
     } catch (err) {
-      console.error('❌ 다음 여행 조회 실패:', err)
+      console.error(' 다음 여행 조회 실패:', err)
       setError(err.response?.data?.detail || '다음 여행 조회 실패')
       return null
     } finally {
       setLoading(false)
     }
   }
-
 
   return {
     loading,

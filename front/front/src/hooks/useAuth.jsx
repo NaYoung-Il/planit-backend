@@ -110,6 +110,38 @@ export const useAuth = () => {
     }
   }
 
+  // 프로필 사진 업로드 (localStorage)
+  const uploadAvatar = async (file) => {
+    setLoading(true)
+    setError(null)
+    try {
+      return new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const avatarUrl = reader.result
+          localStorage.setItem('user_avatar', avatarUrl)
+          resolve({ avatar_url: avatarUrl })
+        }
+        reader.readAsDataURL(file)
+      })
+    } catch (err) {
+      setError('프로필 사진 업로드 실패')
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 프로필 사진 가져오기
+  const getAvatar = () => {
+    return localStorage.getItem('user_avatar') || null
+  }
+
+  // 프로필 사진 삭제
+  const deleteAvatar = () => {
+    localStorage.removeItem('user_avatar')
+  }
+
   return {
     loading,
     error,
@@ -120,5 +152,8 @@ export const useAuth = () => {
     getAllUsers,
     updateUser,
     deleteUser,
+    uploadAvatar,
+    getAvatar,
+    deleteAvatar,
   }
 }
